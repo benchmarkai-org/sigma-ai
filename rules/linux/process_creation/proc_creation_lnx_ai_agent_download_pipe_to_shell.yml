@@ -1,0 +1,62 @@
+title: AI Coding Agent Shell Command Piping Download Into Interpreter
+id: bff0f7b6-ec02-4fda-a4d4-a2bba951c9f5
+status: experimental
+description: |
+    Detects a shell command run by an AI coding agent that downloads content with curl or wget and passes it straight to a shell or script interpreter.
+    This is a common install pattern, but when an agent runs it the URL often comes from text the agent read (a README, an issue, a web page), not from the user.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://attack.mitre.org/techniques/T1059/004/
+    - https://attack.mitre.org/techniques/T1105/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.execution
+    - attack.t1059.004
+    - attack.command-and-control
+    - attack.t1105
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    # Agent identification. Coding agents run tool commands through a shell (bash -c, bash -lc or sh -c),
+    # so the command text shows up in the CommandLine of the shell and the agent is the ParentImage.
+    selection_agent_parent_image:
+        ParentImage|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_parent_path:
+        ParentImage|contains: '/claude/versions/' # Claude Code native install keeps one binary per version under ~/.local/share/claude/versions/
+    selection_agent_parent_cli:
+        # Agents installed from npm or pip run under node or python, so the parent image alone does not identify them
+        ParentCommandLine|contains:
+            - '@anthropic-ai/claude-code'
+            - '@google/gemini-cli'
+            - '@openai/codex'
+            - '@sourcegraph/amp'
+            - '/bin/aider'
+            - '/bin/gemini'
+            - 'codex-linux-sandbox'
+            - 'opencode-ai'
+    selection_agent_snapshot:
+        CommandLine|contains: '/.claude/shell-snapshots/' # Claude Code sources a shell snapshot before each Bash tool command
+    selection_pipe:
+        CommandLine|re: '(curl|wget)\s[^|]*\|\s*(sudo\s+)?((ba|z|da)?sh|python[0-9.]*|perl|ruby|node)\b'
+    selection_subst:
+        CommandLine|contains:
+            - '$(curl'
+            - '$(wget'
+            - '<(curl'
+            - '<(wget'
+    condition: 1 of selection_agent_* and (selection_pipe or selection_subst)
+falsepositives:
+    - Tool installers that document "curl | sh" (rustup, bun, uv, nvm) when the user asked the agent to install them
+level: medium

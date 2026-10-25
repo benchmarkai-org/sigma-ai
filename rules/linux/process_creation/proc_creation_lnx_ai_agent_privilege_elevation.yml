@@ -1,0 +1,57 @@
+title: AI Coding Agent Shell Command Using Sudo Or Pkexec
+id: 74425ecb-1d45-4c6d-b339-c41d4c208374
+status: experimental
+description: |
+    Detects a shell command run by an AI coding agent that uses sudo, pkexec, doas or run0.
+    On a single-user desktop this is often legitimate (installing a package), so the rule is meant for visibility and for correlation with the other rules in the pack.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://attack.mitre.org/techniques/T1548/003/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.privilege-escalation
+    - attack.t1548.003
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    # Agent identification. Coding agents run tool commands through a shell (bash -c, bash -lc or sh -c),
+    # so the command text shows up in the CommandLine of the shell and the agent is the ParentImage.
+    selection_agent_parent_image:
+        ParentImage|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_parent_path:
+        ParentImage|contains: '/claude/versions/' # Claude Code native install keeps one binary per version under ~/.local/share/claude/versions/
+    selection_agent_parent_cli:
+        # Agents installed from npm or pip run under node or python, so the parent image alone does not identify them
+        ParentCommandLine|contains:
+            - '@anthropic-ai/claude-code'
+            - '@google/gemini-cli'
+            - '@openai/codex'
+            - '@sourcegraph/amp'
+            - '/bin/aider'
+            - '/bin/gemini'
+            - 'codex-linux-sandbox'
+            - 'opencode-ai'
+    selection_agent_snapshot:
+        CommandLine|contains: '/.claude/shell-snapshots/' # Claude Code sources a shell snapshot before each Bash tool command
+    selection_elevate:
+        CommandLine|contains:
+            - 'doas '
+            - 'pkexec '
+            - 'run0 '
+            - 'sudo '
+    condition: 1 of selection_agent_* and selection_elevate
+falsepositives:
+    - Package installation or service management the user asked for
+level: low

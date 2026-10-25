@@ -1,0 +1,74 @@
+title: AI Coding Agent Changing Agent Permission Settings Or Launching Agent Without Approvals
+id: 4f9305eb-dd29-4518-bcd6-beac4ae02656
+status: experimental
+description: |
+    Detects a shell command run by an AI coding agent that writes to an agent's own settings files (where permissions, allowed commands and hooks live), or that launches an agent with its approval prompts or sandbox turned off.
+    An agent that changes its own permission settings removes the check the user relies on.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://attack.mitre.org/techniques/T1562/001/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.defense-evasion
+    - attack.t1562.001
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    # Agent identification. Coding agents run tool commands through a shell (bash -c, bash -lc or sh -c),
+    # so the command text shows up in the CommandLine of the shell and the agent is the ParentImage.
+    selection_agent_parent_image:
+        ParentImage|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_parent_path:
+        ParentImage|contains: '/claude/versions/' # Claude Code native install keeps one binary per version under ~/.local/share/claude/versions/
+    selection_agent_parent_cli:
+        # Agents installed from npm or pip run under node or python, so the parent image alone does not identify them
+        ParentCommandLine|contains:
+            - '@anthropic-ai/claude-code'
+            - '@google/gemini-cli'
+            - '@openai/codex'
+            - '@sourcegraph/amp'
+            - '/bin/aider'
+            - '/bin/gemini'
+            - 'codex-linux-sandbox'
+            - 'opencode-ai'
+    selection_agent_snapshot:
+        CommandLine|contains: '/.claude/shell-snapshots/' # Claude Code sources a shell snapshot before each Bash tool command
+    selection_config:
+        CommandLine|contains:
+            - '.claude/settings'
+            - '.codex/config.toml'
+            - '.config/opencode/'
+            - '.gemini/settings.json'
+            - 'opencode.json'
+    selection_write:
+        CommandLine|contains:
+            - '>>'
+            - '> '
+            - 'cp '
+            - 'jq '
+            - 'mv '
+            - 'sed -i'
+            - 'tee '
+    selection_bypass:
+        CommandLine|contains:
+            - '--dangerously-bypass-approvals-and-sandbox'
+            - '--dangerously-skip-permissions'
+            - '--permission-mode bypassPermissions'
+            - '--yolo'
+    condition: 1 of selection_agent_* and ((selection_config and selection_write) or selection_bypass)
+falsepositives:
+    - The user asks the agent to change its own settings
+    - Scripted multi-agent setups that start sub-agents without approvals inside a container or VM
+level: high

@@ -1,0 +1,42 @@
+title: AI Coding Agent Process Reading Credential Or Browser Files
+id: c47145f6-3f20-44ee-bc41-1a2df5075e32
+status: experimental
+description: |
+    Detects an AI coding agent process (or the node or bun runtime it runs on) reading files covered by the "ai_agent_secrets" audit watch: SSH keys, cloud credentials, keyrings and browser profiles.
+    This catches reads made by the agent's built-in file tools, which do not start a shell and so are not seen by the process_creation rules in the pack.
+    Requires the audit rules in documentation/ai-coding-agents/ai-agents.rules. SYSCALL records carry the key and the process executable, so no correlation with PATH records is needed.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://man7.org/linux/man-pages/man7/audit.rules.7.html
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.credential-access
+    - attack.t1552.004
+    - attack.t1555.003
+logsource:
+    product: linux
+    service: auditd
+detection:
+    selection_key:
+        type: 'SYSCALL'
+        key: 'ai_agent_secrets'
+    selection_agent_exe:
+        exe|endswith:
+            - '/bun'
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/node'
+            - '/opencode'
+    selection_agent_exe_path:
+        exe|contains: '/claude/versions/'
+    condition: selection_key and 1 of selection_agent_*
+falsepositives:
+    - Other node or bun applications that legitimately read these files (for example an Electron password manager)
+level: high

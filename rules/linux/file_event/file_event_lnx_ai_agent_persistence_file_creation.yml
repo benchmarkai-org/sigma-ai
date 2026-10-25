@@ -1,0 +1,58 @@
+title: AI Coding Agent Process Creating Startup Or Login Files
+id: 1fc446e9-7bc4-4136-9d0c-4b56806c6afe
+status: experimental
+description: |
+    Detects a native AI coding agent binary creating files run at login or session start: shell rc files, Hyprland and UWSM config, systemd user units, XDG autostart entries and SSH authorized_keys.
+    Agents installed from npm run as node, which this rule does not match because file events carry no command line. Use the auditd rule in the pack for those.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://github.com/microsoft/SysmonForLinux
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.persistence
+    - attack.t1546.004
+    - attack.t1543.002
+    - attack.t1547.013
+logsource:
+    category: file_event
+    product: linux
+detection:
+    selection_agent_image:
+        Image|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_path:
+        Image|contains: '/claude/versions/'
+    selection_target:
+        TargetFilename|contains:
+            - '/.bash_login'
+            - '/.bash_logout'
+            - '/.bash_profile'
+            - '/.bashrc'
+            - '/.config/autostart/'
+            - '/.config/environment.d/'
+            - '/.config/fish/config.fish'
+            - '/.config/hypr/'
+            - '/.config/systemd/user/'
+            - '/.config/uwsm/'
+            - '/.local/share/applications/'
+            - '/.profile'
+            - '/.ssh/authorized_keys'
+            - '/.ssh/rc'
+            - '/.zlogin'
+            - '/.zprofile'
+            - '/.zshenv'
+            - '/.zshrc'
+    condition: 1 of selection_agent_* and selection_target
+falsepositives:
+    - The user asks the agent to change their shell, Hyprland or systemd configuration
+level: medium

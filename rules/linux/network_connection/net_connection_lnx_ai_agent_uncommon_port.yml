@@ -1,0 +1,47 @@
+title: AI Coding Agent Process Connecting To Uncommon Port
+id: 1efa633d-728e-4297-ac05-17c75c99b219
+status: experimental
+description: |
+    Detects a native AI coding agent binary making an outbound connection to a port other than 80 or 443, excluding loopback.
+    Agents talk to their model API over HTTPS. Other ports usually mean the agent's own fetch tool was pointed at something unusual.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://attack.mitre.org/techniques/T1571/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.command-and-control
+    - attack.t1571
+logsource:
+    category: network_connection
+    product: linux
+detection:
+    selection_agent_image:
+        Image|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_path:
+        Image|contains: '/claude/versions/'
+    selection_initiated:
+        Initiated: 'true'
+    filter_main_web_ports:
+        DestinationPort:
+            - 80
+            - 443
+    filter_main_loopback:
+        DestinationIp|cidr:
+            - '127.0.0.0/8'
+            - '::1/128'
+    condition: 1 of selection_agent_* and selection_initiated and not 1 of filter_main_*
+falsepositives:
+    - MCP servers or development servers on the local network reached by the agent's fetch tool
+    - Proxies on non-standard ports
+level: low

@@ -1,0 +1,63 @@
+title: AI Coding Agent Shell Command Accessing Browser Profile Data
+id: d1e22b1f-9338-4dc5-8602-24b2b7e10845
+status: experimental
+description: |
+    Detects a shell command run by an AI coding agent that references a browser profile directory (Chromium, Chrome, Brave, Vivaldi, Edge or Firefox).
+    Browser profiles hold cookies, saved passwords and session tokens. Coding work rarely needs them.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://attack.mitre.org/techniques/T1555/003/
+    - https://attack.mitre.org/techniques/T1539/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.credential-access
+    - attack.t1555.003
+    - attack.t1539
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    # Agent identification. Coding agents run tool commands through a shell (bash -c, bash -lc or sh -c),
+    # so the command text shows up in the CommandLine of the shell and the agent is the ParentImage.
+    selection_agent_parent_image:
+        ParentImage|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_parent_path:
+        ParentImage|contains: '/claude/versions/' # Claude Code native install keeps one binary per version under ~/.local/share/claude/versions/
+    selection_agent_parent_cli:
+        # Agents installed from npm or pip run under node or python, so the parent image alone does not identify them
+        ParentCommandLine|contains:
+            - '@anthropic-ai/claude-code'
+            - '@google/gemini-cli'
+            - '@openai/codex'
+            - '@sourcegraph/amp'
+            - '/bin/aider'
+            - '/bin/gemini'
+            - 'codex-linux-sandbox'
+            - 'opencode-ai'
+    selection_agent_snapshot:
+        CommandLine|contains: '/.claude/shell-snapshots/' # Claude Code sources a shell snapshot before each Bash tool command
+    selection_target:
+        CommandLine|contains:
+            - '/.config/BraveSoftware/'
+            - '/.config/chromium/'
+            - '/.config/google-chrome'
+            - '/.config/microsoft-edge'
+            - '/.config/vivaldi'
+            - '/.mozilla/firefox/'
+            - '/snap/firefox/common/.mozilla/'
+    condition: 1 of selection_agent_* and selection_target
+falsepositives:
+    - Browser automation work where the agent is told to reuse an existing profile
+    - Debugging a browser extension under development
+level: high
