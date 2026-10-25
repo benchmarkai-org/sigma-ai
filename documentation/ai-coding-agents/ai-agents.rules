@@ -1,0 +1,48 @@
+## Audit rules for the AI coding agent Sigma pack
+##
+## Used by:
+##   rules/linux/auditd/lnx_auditd_ai_agent_sensitive_file_access.yml   (key ai_agent_secrets)
+##   rules/linux/auditd/lnx_auditd_ai_agent_persistence_file_write.yml  (key ai_agent_persistence)
+##
+## Install: replace /home/USER with your home directory, remove lines for paths
+## that do not exist on your machine (auditctl refuses a watch on a missing path),
+## copy to /etc/audit/rules.d/ and run "augenrules --load".
+##
+## A watch on a directory covers everything below it.
+
+## Credential files: reads
+-w /home/USER/.ssh -p r -k ai_agent_secrets
+-w /home/USER/.gnupg -p r -k ai_agent_secrets
+-w /home/USER/.aws -p r -k ai_agent_secrets
+-w /home/USER/.config/gh/hosts.yml -p r -k ai_agent_secrets
+-w /home/USER/.config/gcloud -p r -k ai_agent_secrets
+-w /home/USER/.docker/config.json -p r -k ai_agent_secrets
+-w /home/USER/.kube/config -p r -k ai_agent_secrets
+-w /home/USER/.git-credentials -p r -k ai_agent_secrets
+-w /home/USER/.netrc -p r -k ai_agent_secrets
+-w /home/USER/.local/share/keyrings -p r -k ai_agent_secrets
+-w /home/USER/.password-store -p r -k ai_agent_secrets
+
+## Browser profiles: reads. Off by default because the browser itself reads
+## these files constantly, which produces a lot of audit records. The Sigma rule
+## only alerts on agent processes, but the records are still written.
+## Firefox profile directories have a random name; fill in your own.
+#-w /home/USER/.config/chromium/Default/Cookies -p r -k ai_agent_secrets
+## "Login Data" is left out: its name contains a space, and how auditctl parses
+## that in a rules file has not been checked.
+#-w /home/USER/.mozilla/firefox/PROFILE/logins.json -p r -k ai_agent_secrets
+#-w /home/USER/.mozilla/firefox/PROFILE/key4.db -p r -k ai_agent_secrets
+#-w /home/USER/.mozilla/firefox/PROFILE/cookies.sqlite -p r -k ai_agent_secrets
+
+## Startup and login files: writes and attribute changes
+-w /home/USER/.bashrc -p wa -k ai_agent_persistence
+-w /home/USER/.bash_profile -p wa -k ai_agent_persistence
+-w /home/USER/.profile -p wa -k ai_agent_persistence
+-w /home/USER/.zshrc -p wa -k ai_agent_persistence
+-w /home/USER/.zprofile -p wa -k ai_agent_persistence
+-w /home/USER/.config/hypr -p wa -k ai_agent_persistence
+-w /home/USER/.config/uwsm -p wa -k ai_agent_persistence
+-w /home/USER/.config/systemd/user -p wa -k ai_agent_persistence
+-w /home/USER/.config/autostart -p wa -k ai_agent_persistence
+-w /home/USER/.config/environment.d -p wa -k ai_agent_persistence
+-w /home/USER/.ssh/authorized_keys -p wa -k ai_agent_persistence

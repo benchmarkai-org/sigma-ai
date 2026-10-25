@@ -1,0 +1,92 @@
+title: AI Coding Agent Shell Command Writing To Startup Or Login Files
+id: aed3518c-5825-45af-989f-6231a7a796c5
+status: experimental
+description: |
+    Detects a shell command run by an AI coding agent that writes to files run at login or session start: shell rc files, Hyprland and UWSM config, systemd user units, XDG autostart entries and SSH authorized_keys.
+    It also detects the agent enabling a systemd user unit or editing the crontab.
+    Code placed in these files keeps running after the agent session ends.
+    Part of the AI coding agent pack; see documentation/ai-coding-agents/README.md for the log source setup it assumes.
+references:
+    - https://github.com/anthropics/claude-code
+    - https://github.com/openai/codex
+    - https://github.com/sst/opencode
+    - https://github.com/google-gemini/gemini-cli
+    - https://wiki.hypr.land/Configuring/Keywords/#executing
+    - https://attack.mitre.org/techniques/T1546/004/
+    - https://attack.mitre.org/techniques/T1543/002/
+author: Mark Briers
+date: 2026-10-25
+tags:
+    - attack.persistence
+    - attack.t1546.004
+    - attack.t1543.002
+    - attack.t1547.013
+    - attack.t1098.004
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    # Agent identification. Coding agents run tool commands through a shell (bash -c, bash -lc or sh -c),
+    # so the command text shows up in the CommandLine of the shell and the agent is the ParentImage.
+    selection_agent_parent_image:
+        ParentImage|endswith:
+            - '/claude'
+            - '/codex'
+            - '/crush'
+            - '/cursor-agent'
+            - '/goose'
+            - '/opencode'
+    selection_agent_parent_path:
+        ParentImage|contains: '/claude/versions/' # Claude Code native install keeps one binary per version under ~/.local/share/claude/versions/
+    selection_agent_parent_cli:
+        # Agents installed from npm or pip run under node or python, so the parent image alone does not identify them
+        ParentCommandLine|contains:
+            - '@anthropic-ai/claude-code'
+            - '@google/gemini-cli'
+            - '@openai/codex'
+            - '@sourcegraph/amp'
+            - '/bin/aider'
+            - '/bin/gemini'
+            - 'codex-linux-sandbox'
+            - 'opencode-ai'
+    selection_agent_snapshot:
+        CommandLine|contains: '/.claude/shell-snapshots/' # Claude Code sources a shell snapshot before each Bash tool command
+    selection_path:
+        CommandLine|contains:
+            - '/.bash_login'
+            - '/.bash_logout'
+            - '/.bash_profile'
+            - '/.bashrc'
+            - '/.config/autostart/'
+            - '/.config/environment.d/'
+            - '/.config/fish/config.fish'
+            - '/.config/hypr/'
+            - '/.config/systemd/user/'
+            - '/.config/uwsm/'
+            - '/.local/share/applications/'
+            - '/.profile'
+            - '/.ssh/authorized_keys'
+            - '/.ssh/rc'
+            - '/.zlogin'
+            - '/.zprofile'
+            - '/.zshenv'
+            - '/.zshrc'
+    selection_write:
+        CommandLine|contains:
+            - '>>'
+            - 'cp '
+            - 'install '
+            - 'ln -s'
+            - 'mv '
+            - 'sed -i'
+            - 'tee '
+    selection_schedule:
+        CommandLine|contains:
+            - 'crontab -'
+            - 'systemctl --user enable'
+            - 'systemctl --user link'
+    condition: 1 of selection_agent_* and ((selection_path and selection_write) or selection_schedule)
+falsepositives:
+    - The user asks the agent to change their shell, Hyprland or systemd configuration
+    - Dotfile repository work, where the agent edits these files by design
+level: medium
